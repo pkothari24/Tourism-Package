@@ -14,11 +14,11 @@ jobs:
         with:
           python-version: '3.10'
       - name: Install Dependencies
-        run: pip install -r tourism_project/deployment/requirements.txt
+        run: pip install -r project/deployment/requirements.txt
       - name: Upload Dataset to Hugging Face Hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: python tourism_project/model_building/data_register.py
+        run: python project/deployment/data_register.py
 
   data-prep:
     needs: register-dataset
@@ -30,11 +30,11 @@ jobs:
         with:
           python-version: '3.10'
       - name: Install Dependencies
-        run: pip install -r tourism_project/deployment/requirements.txt
+        run: pip install -r project/deployment/requirements.txt
       - name: Run Data Preparation
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: python tourism_project/model_building/prep.py
+        run: python project/model_building/prep.py
 
   model-training:
     needs: data-prep
@@ -46,14 +46,14 @@ jobs:
         with:
           python-version: '3.10'
       - name: Install Dependencies
-        run: pip install -r tourism_project/deployment/requirements.txt
+        run: pip install -r project/deployment/requirements.txt
       - name: Model Building, Tracking & Registration
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
           MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
           MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
-        run: python tourism_project/model_building/train.py
+        run: python project/model_building/train.py
 
   deploy-hosting:
     runs-on: ubuntu-latest
@@ -65,11 +65,11 @@ jobs:
         with:
           python-version: '3.10'
       - name: Install Dependencies
-        run: pip install -r tourism_project/deployment/requirements.txt
+        run: pip install -r project/deployment/requirements.txt
       - name: Push files to Frontend Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: python tourism_project/hosting/hosting.py
+        run: python project/hosting/hosting.py
 on:
   push:
     branches:
