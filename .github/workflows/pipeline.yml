@@ -1,5 +1,5 @@
 ```
-name: Tourism Project Pipeline
+name: Tourism-Package Pipeline
 
 on:
   workflow_dispatch:
