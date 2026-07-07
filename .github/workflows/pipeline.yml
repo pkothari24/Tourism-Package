@@ -1,19 +1,27 @@
 name: Tourism-Package Pipeline
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main  # Automatically triggers on push to the main branch
+  workflow_dispatch: # Allows you to trigger manually from the GitHub UI
 
 jobs:
   register-dataset:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+
       - name: Install Dependencies
-        run: pip install -r project/deployment/requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r project/deployment/requirements.txt
+
       - name: Upload Dataset to Hugging Face Hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -23,13 +31,18 @@ jobs:
     needs: register-dataset
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+
       - name: Install Dependencies
-        run: pip install -r project/deployment/requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r project/deployment/requirements.txt
+
       - name: Run Data Preparation
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -39,13 +52,18 @@ jobs:
     needs: data-prep
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+
       - name: Install Dependencies
-        run: pip install -r project/deployment/requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r project/deployment/requirements.txt mlflow
+
       - name: Model Building, Tracking & Registration
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -58,100 +76,22 @@ jobs:
     runs-on: ubuntu-latest
     needs: model-training
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true  # Pulls Large Files like models or dataset caches if needed
+
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+
       - name: Install Dependencies
-        run: pip install -r project/deployment/requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r project/deployment/requirements.txt
+
       - name: Push files to Frontend Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: python project/hosting/hosting.py
-name: Machine Learning and Deployment Pipeline
-
-on:
-  push:
-    branches:
-      - main  # Automatically triggers on push to the main branch
-  workflow_dispatch: # Allows manual triggering from the UI
-
-jobs:
-
-  register-dataset:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-with-version: '3.10'
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install huggingface_hub datasets
-      - name: Upload Dataset to Hugging Face Hub
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          # Replace with your actual dataset script or CLI upload command
-          python src/register_dataset.py
-
-  data-prep:
-    needs: register-dataset
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-with-version: '3.10'
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: Run Data Preparation
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          python src/data_prep.py
-
-  model-traning:
-    needs: data-prep
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-with-version: '3.10'
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt mlflow
-      - name: Start MLflow Server
-        run: |
-          nohup mlflow ui --host 0.0.0.0 --port 5000 &  # Run MLflow UI in the background
-          sleep 5  # Wait for a moment to let the server start
-      - name: Model Building
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          python src/train.py
-
-  deploy-hosting:
-    runs-on: ubuntu-latest
-    needs: [model-traning, data-prep, register-dataset]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          lfs: true
-      - name: Push files to Frontend Hugging Face Space
-        uses: huggingface/hub-sync@v1.0
-        with:
-          github_repo_id: ${{ github.repository }}
-          huggingface_repo_id: username/your-space-name  # ⚠️ Change to your HF username/space
-          hf_token: ${{ secrets.HF_TOKEN }}
-          repo_type: space
