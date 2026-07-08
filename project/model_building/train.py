@@ -27,17 +27,22 @@ def main():
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment("Wellness_Tourism_Package_Prediction")
 
-    # 2. Data Loading (Points to your Hugging Face or Local dataset files)
-    # Update these paths to match where your data registration stage saved them
-    Xtrain_path = "hf://datasets/pkothari24/tourism_project/model_building/Xtrain.csv"
-    Xtest_path = "hf://datasets/pkothari24/tourism_project/model_building/Xtest.csv"
-    ytrain_path = "hf://datasets/pkothari24/tourism_project/model_building/ytrain.csv"
-    ytest_path = "hf://datasets/pkothari24/tourism_project/model_building/ytest.csv"
+    # --- 2. FIXED: Data Loading paths (Read locally from the Runner Workspace) ---
+    current_workspace = os.getcwd()
+    
+    Xtrain_path = os.path.join(current_workspace, "Xtrain.csv")
+    Xtest_path = os.path.join(current_workspace, "Xtest.csv")
+    ytrain_path = os.path.join(current_workspace, "ytrain.csv")
+    ytest_path = os.path.join(current_workspace, "ytest.csv")
 
+    print(f"Loading split files from workspace: {current_workspace}")
+    
     Xtrain = pd.read_csv(Xtrain_path)
     Xtest = pd.read_csv(Xtest_path)
     ytrain = pd.read_csv(ytrain_path).squeeze()  # Ensure 1D series for target
     ytest = pd.read_csv(ytest_path).squeeze()
+
+    print("Dataset parts loaded successfully from local workspace files.")
 
     # Drop CustomerID if it hasn't been dropped in the data preparation phase
     if 'CustomerID' in Xtrain.columns:
@@ -134,8 +139,8 @@ def main():
     model_filename = "best_wellness_package_model_v1.joblib"
     joblib.dump(best_model, model_filename)
 
-    # 6. Push Verified Model Version to Hugging Face Model Space Hub
-    repo_id = "praneeth232/machine_failure_model" # Keeping your specified endpoint structure
+    # --- 6. FIXED: Push Verified Model Version to Your Correct HF Account ---
+    repo_id = "pkothari24/Tourism-Package" 
     repo_type = "model"
 
     api = HfApi(token=os.getenv("HF_TOKEN"))
@@ -155,7 +160,7 @@ def main():
         repo_id=repo_id,
         repo_type=repo_type,
     )
-    print("Mangement pipeline complete! Model deployed to HF Registry safely.")
+    print("Management pipeline complete! Model deployed to HF Registry safely.")
 
 if __name__ == "__main__":
     main()
