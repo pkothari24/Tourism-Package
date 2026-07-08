@@ -138,13 +138,13 @@ def main():
 
         signature = infer_signature(Xtest, y_pred_test)
 
-       model_name = "Wellness_Tourism_Package_Prediction_Model"
+        model_name = "Wellness_Tourism_Package_Prediction_Model"
         mlflow.sklearn.log_model(
             sk_model=best_model,
             artifact_path="wellness_package_xgb_pipeline",
             signature=signature,
             registered_model_name=model_name,
-            serialization_format="pickle"  # Bypasses skops verification for third-party XGBoost types
+            serialization_format="pickle"
         )
         print(f"Model logged in MLflow Registry as '{model_name}'")
 
