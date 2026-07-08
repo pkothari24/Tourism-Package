@@ -10,7 +10,7 @@ def main():
 
     api = HfApi(token=hf_token)
 
-    # 2. Configure deployment parameters (FIXED: Removed .git)
+    # 2. Configure deployment parameters
     repo_id = "pkothari24/Tourism-Package"
     repo_type = "space"
 
@@ -20,20 +20,20 @@ def main():
         print(f"Hugging Face Space '{repo_id}' exists. Preparing to push updates...")
     except RepositoryNotFoundError:
         print(f"Space '{repo_id}' not found. Creating a new Streamlit space repository...")
-        # SDK spaces default to Streamlit unless specified otherwise
+        
+        # FIXED: Pass token and explicit lowercase framework option parameter mapping
         create_repo(
             repo_id=repo_id, 
             repo_type=repo_type, 
             space_sdk="streamlit", 
+            token=hf_token,
             private=False
         )
         print(f"Space '{repo_id}' successfully created.")
 
     # 4. Upload the deployment assets folder containing app.py and requirements.txt
-    # Adjusted path to check your project deployment folder structure dynamically
     local_deployment_folder = "project/deployment"
     if not os.path.exists(local_deployment_folder):
-        # Fallback in case your deployment files sit elsewhere in your repository root
         local_deployment_folder = "deployment"
 
     print(f"Uploading deployment files from '{local_deployment_folder}' to Space: {repo_id}...")
