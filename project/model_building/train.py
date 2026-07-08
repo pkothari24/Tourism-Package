@@ -27,10 +27,9 @@ def main():
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment("Wellness_Tourism_Package_Prediction")
 
-    # --- 2. FOOLPROOF REMOTE DATA LOADING VIA RAW ENDPOINTS ---
+    # 2. Remote Data Loading Via Raw Endpoints
     repo_id = "pkothari24/Tourism-Package"
     
-    # We use the raw Hugging Face authenticated download URLs for your split assets
     Xtrain_path = f"https://huggingface.co/datasets/{repo_id}/resolve/main/Xtrain.csv"
     Xtest_path = f"https://huggingface.co/datasets/{repo_id}/resolve/main/Xtest.csv"
     ytrain_path = f"https://huggingface.co/datasets/{repo_id}/resolve/main/ytrain.csv"
@@ -38,7 +37,6 @@ def main():
 
     print(f"🚀 Fetching dataset splits directly from Hugging Face Repository: {repo_id}")
     
-    # Passing the HF token inside storage options or headers if the repository has privacy flags
     storage_options = {"Authorization": f"Bearer {os.getenv('HF_TOKEN')}"} if os.getenv("HF_TOKEN") else None
     
     try:
@@ -50,7 +48,6 @@ def main():
     except Exception as e:
         print(f"❌ Failed downloading splits directly from Hugging Face Hub: {e}")
         print("Falling back to local fallback directory scan...")
-        # Emergency local checking logic
         current_workspace = os.getcwd()
         possible_dirs = [os.path.join(current_workspace, "project", "model_building"), current_workspace]
         data_dir = None
@@ -59,7 +56,7 @@ def main():
                 data_dir = directory
                 break
         if not data_dir:
-            raise FileNotFoundError(f"Data split structures could not be retrieved remotely or locally from workspace root context.")
+            raise FileNotFoundError("Data split structures could not be retrieved remotely or locally.")
         Xtrain = pd.read_csv(os.path.join(data_dir, "Xtrain.csv"))
         Xtest = pd.read_csv(os.path.join(data_dir, "Xtest.csv"))
         ytrain = pd.read_csv(os.path.join(data_dir, "ytrain.csv")).squeeze()
@@ -104,9 +101,8 @@ def main():
 
     model_pipeline = make_pipeline(preprocessor, xgb_model)
 
-        #  Replace it with this clean block:
-        with mlflow.start_run(run_name="XGBoost_Wellness_Package_Tuning") as parent_run:
-        # Pass ytrain directly as the targets source array to prevent MLflow from looking inside Xtrain
+    # 4. Start MLflow Parent Run for Hyperparameter Tuning
+    with mlflow.start_run(run_name="XGBoost_Wellness_Package_Tuning") as parent_run:
         train_dataset = mlflow.data.from_pandas(Xtrain, targets=ytrain, name="travel_wellness_train")
         mlflow.log_input(train_dataset, context="training")
 
@@ -155,7 +151,7 @@ def main():
     model_filename = "best_wellness_package_model_v1.joblib"
     joblib.dump(best_model, model_filename)
 
-    # --- 6. Push Verified Model Version to your Hugging Face Space ---
+    # 6. Push Verified Model Version to your Hugging Face Space
     repo_type = "model"
 
     api = HfApi(token=os.getenv("HF_TOKEN"))
