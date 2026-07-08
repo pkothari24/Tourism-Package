@@ -10,9 +10,18 @@ from sklearn.preprocessing import LabelEncoder
 # for hugging face space authentication to upload files
 from huggingface_hub import login, HfApi
 
-# Define constants for the dataset and output paths
+# Initialize the API client
 api = HfApi(token=os.getenv("HF_TOKEN"))
-DATASET_PATH = "hf://datasets/pkothari24/Tourism-Package/project/model_building/tourism.csv"
+
+# --- FIXED: Read the file locally from the runner workspace ---
+# Since the script runs from the repository root, point to the file directly
+DATASET_PATH = os.path.join(os.getcwd(), "project", "model_building", "tourism.csv")
+
+print(f"Loading dataset from: {DATASET_PATH}")
+if not os.path.exists(DATASET_PATH):
+    # Fallback in case your folder capitalization varies
+    DATASET_PATH = os.path.join(os.getcwd(), "tourism_project", "data", "tourism.csv")
+
 df = pd.read_csv(DATASET_PATH)
 print("Dataset loaded successfully.")
 
@@ -34,14 +43,15 @@ Xtrain, Xtest, ytrain, ytest = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
-Xtrain.to_csv("Xtrain.csv",index=False)
-Xtest.to_csv("Xtest.csv",index=False)
-ytrain.to_csv("ytrain.csv",index=False)
-ytest.to_csv("ytest.csv",index=False)
+# Save split outputs locally
+Xtrain.to_csv("Xtrain.csv", index=False)
+Xtest.to_csv("Xtest.csv", index=False)
+ytrain.to_csv("ytrain.csv", index=False)
+ytest.to_csv("ytest.csv", index=False)
 
+files = ["Xtrain.csv", "Xtest.csv", "ytrain.csv", "ytest.csv"]
 
-files = ["Xtrain.csv","Xtest.csv","ytrain.csv","ytest.csv"]
-
+print("Uploading processed splits to Hugging Face...")
 for file_path in files:
     api.upload_file(
         path_or_fileobj=file_path,
@@ -49,3 +59,5 @@ for file_path in files:
         repo_id="pkothari24/tourism_project",
         repo_type="dataset",
     )
+
+print("All files processed and uploaded successfully!")
