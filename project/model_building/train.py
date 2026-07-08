@@ -27,38 +27,43 @@ def main():
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment("Wellness_Tourism_Package_Prediction")
 
-    # --- 2. FLEXIBLE SUB-DIRECTORY DATA LOADING ---
-    current_workspace = os.getcwd()
+    # --- 2. FOOLPROOF REMOTE DATA LOADING VIA RAW ENDPOINTS ---
+    repo_id = "pkothari24/Tourism-Package"
     
-    # Check both the workspace root and the project/model_building directory
-    possible_dirs = [
-        os.path.join(current_workspace, "project", "model_building"),
-        current_workspace
-    ]
-    
-    data_dir = None
-    for directory in possible_dirs:
-        test_path = os.path.join(directory, "Xtrain.csv")
-        if os.path.exists(test_path):
-            data_dir = directory
-            break
-            
-    if data_dir is None:
-        print(f"❌ CRITICAL ERROR: Could not find Xtrain.csv anywhere.")
-        print("Root files available:", os.listdir(current_workspace))
-        raise FileNotFoundError("The split data files are completely missing from the runner environment.")
+    # We use the raw Hugging Face authenticated download URLs for your split assets
+    Xtrain_path = f"https://huggingface.co/datasets/{repo_id}/resolve/main/Xtrain.csv"
+    Xtest_path = f"https://huggingface.co/datasets/{repo_id}/resolve/main/Xtest.csv"
+    ytrain_path = f"https://huggingface.co/datasets/{repo_id}/resolve/main/ytrain.csv"
+    ytest_path = f"https://huggingface.co/datasets/{repo_id}/resolve/main/ytest.csv"
 
-    Xtrain_path = os.path.join(data_dir, "Xtrain.csv")
-    Xtest_path = os.path.join(data_dir, "Xtest.csv")
-    ytrain_path = os.path.join(data_dir, "ytrain.csv")
-    ytest_path = os.path.join(data_dir, "ytest.csv")
-
-    print(f"🚀 Success! Loading split CSV files from: {data_dir}")
+    print(f"🚀 Fetching dataset splits directly from Hugging Face Repository: {repo_id}")
     
-    Xtrain = pd.read_csv(Xtrain_path)
-    Xtest = pd.read_csv(Xtest_path)
-    ytrain = pd.read_csv(ytrain_path).squeeze()  # Ensure 1D series for target
-    ytest = pd.read_csv(ytest_path).squeeze()
+    # Passing the HF token inside storage options or headers if the repository has privacy flags
+    storage_options = {"Authorization": f"Bearer {os.getenv('HF_TOKEN')}"} if os.getenv("HF_TOKEN") else None
+    
+    try:
+        Xtrain = pd.read_csv(Xtrain_path, storage_options=storage_options)
+        Xtest = pd.read_csv(Xtest_path, storage_options=storage_options)
+        ytrain = pd.read_csv(ytrain_path, storage_options=storage_options).squeeze()
+        ytest = pd.read_csv(ytest_path, storage_options=storage_options).squeeze()
+        print("✅ Success! Splits fetched and loaded into Pandas memory frames.")
+    except Exception as e:
+        print(f"❌ Failed downloading splits directly from Hugging Face Hub: {e}")
+        print("Falling back to local fallback directory scan...")
+        # Emergency local checking logic
+        current_workspace = os.getcwd()
+        possible_dirs = [os.path.join(current_workspace, "project", "model_building"), current_workspace]
+        data_dir = None
+        for directory in possible_dirs:
+            if os.path.exists(os.path.join(directory, "Xtrain.csv")):
+                data_dir = directory
+                break
+        if not data_dir:
+            raise FileNotFoundError(f"Data split structures could not be retrieved remotely or locally from workspace root context.")
+        Xtrain = pd.read_csv(os.path.join(data_dir, "Xtrain.csv"))
+        Xtest = pd.read_csv(os.path.join(data_dir, "Xtest.csv"))
+        ytrain = pd.read_csv(os.path.join(data_dir, "ytrain.csv")).squeeze()
+        ytest = pd.read_csv(os.path.join(data_dir, "ytest.csv")).squeeze()
 
     # Drop CustomerID if it hasn't been dropped in the data preparation phase
     if 'CustomerID' in Xtrain.columns:
@@ -101,8 +106,6 @@ def main():
 
     # 4. Start MLflow Parent Run for Hyperparameter Tuning
     with mlflow.start_run(run_name="XGBoost_Wellness_Package_Tuning") as parent_run:
-
-        # Log Dataset Metadata Lineage
         train_dataset = mlflow.data.from_pandas(Xtrain, targets=ytrain.name, name="travel_wellness_train")
         mlflow.log_input(train_dataset, context="training")
 
@@ -110,7 +113,7 @@ def main():
         grid_search = GridSearchCV(model_pipeline, param_grid, cv=3, scoring='f1', n_jobs=-1)
         grid_search.fit(Xtrain, ytrain)
 
-        best_model = grid_search.best_estimator__
+        best_model = grid_search.best_estimator_
 
         print("Best Hyperparameters Found:\n", grid_search.best_params_)
         for param_name, param_value in grid_search.best_params_.items():
@@ -152,7 +155,6 @@ def main():
     joblib.dump(best_model, model_filename)
 
     # --- 6. Push Verified Model Version to your Hugging Face Space ---
-    repo_id = "pkothari24/Tourism-Package" 
     repo_type = "model"
 
     api = HfApi(token=os.getenv("HF_TOKEN"))
