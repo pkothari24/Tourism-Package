@@ -27,33 +27,26 @@ def main():
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment("Wellness_Tourism_Package_Prediction")
 
-    # 2. Local Data Loading explicitly targeted at the data subdirectory
+    # 2. Dynamic Data Loading and Splitting
     current_workspace = os.getcwd()
-    possible_dirs = [
-        os.path.join(current_workspace, "project", "data"), # Target directory discovered in workspace diagnostics
-        os.path.join(current_workspace, "project", "model_building"),
-        current_workspace
-    ]
+    raw_data_path = os.path.join(current_workspace, "project", "data", "tourism.csv")
     
-    data_dir = None
-    for directory in possible_dirs:
-        if os.path.exists(os.path.join(directory, "Xtrain.csv")):
-            data_dir = directory
-            break
-            
-    if not data_dir:
-        print("Files in workspace:", os.listdir(current_workspace))
-        if os.path.exists(os.path.join(current_workspace, "project")):
-            print("Files in project folder:", os.listdir(os.path.join(current_workspace, "project")))
-            if os.path.exists(os.path.join(current_workspace, "project", "data")):
-                print("Files in project/data folder:", os.listdir(os.path.join(current_workspace, "project", "data")))
-        raise FileNotFoundError("Could not locate split CSV files locally in any known project folder structures.")
+    if not os.path.exists(raw_data_path):
+        raise FileNotFoundError(f"Could not locate base raw dataset at {raw_data_path}")
 
-    print(f"🚀 Success! Loading split CSV files locally from: {data_dir}")
-    Xtrain = pd.read_csv(os.path.join(data_dir, "Xtrain.csv"))
-    Xtest = pd.read_csv(os.path.join(data_dir, "Xtest.csv"))
-    ytrain = pd.read_csv(os.path.join(data_dir, "ytrain.csv")).squeeze()
-    ytest = pd.read_csv(os.path.join(data_dir, "ytest.csv")).squeeze()
+    print(f"🚀 Found raw data at: {raw_data_path}. Splitting into train/test states dynamically...")
+    df = pd.read_csv(raw_data_path)
+
+    # Separate target variable 'ProdTaken' from features
+    target_col = 'ProdTaken'
+    if target_col not in df.columns:
+        raise KeyError(f"Target column '{target_col}' not found in the dataset features.")
+        
+    X = df.drop(columns=[target_col])
+    y = df[target_col].squeeze()
+
+    # Perform a clean 80/20 stratification split
+    Xtrain, Xtest, ytrain, ytest = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
     # Drop CustomerID if present
     if 'CustomerID' in Xtrain.columns:
@@ -66,9 +59,13 @@ def main():
         'NumberOfTrips', 'Passport', 'OwnCar', 'NumberOfChildrenVisiting', 
         'MonthlyIncome', 'PitchSatisfactionScore', 'NumberOfFollowups', 'DurationOfPitch'
     ]
+    # Filter to only include features actually present in the CSV to prevent KeyError
+    numeric_features = [f for f in numeric_features if f in Xtrain.columns]
+
     categorical_features = [
         'TypeofContact', 'Occupation', 'Gender', 'MaritalStatus', 'Designation', 'ProductPitched'
     ]
+    categorical_features = [f for f in categorical_features if f in Xtrain.columns]
 
     class_weight = ytrain.value_counts()[0] / ytrain.value_counts()[1]
     preprocessor = make_column_transformer(
