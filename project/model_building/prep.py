@@ -25,9 +25,20 @@ if not os.path.exists(DATASET_PATH):
 df = pd.read_csv(DATASET_PATH)
 print("Dataset loaded successfully.")
 
-# Drop the unique identifier
-df.drop(columns=['UDI'], inplace=True)
+# --- SAFE COLUMN DROPPING ---
+# Prints all available columns so you can see them in your GitHub Action logs
+print("Available columns in dataset:", df.columns.tolist())
 
+# Only drop if it exists
+if 'UDI' in df.columns:
+    df.drop(columns=['UDI'], inplace=True)
+    print("Dropped 'UDI' column.")
+elif 'udi' in df.columns:
+    df.drop(columns=['udi'], inplace=True)
+    print("Dropped 'udi' column.")
+else:
+    print("No 'UDI' or 'udi' column found. Skipping drop step safely.")
+    
 # Encoding the categorical 'Type' column
 label_encoder = LabelEncoder()
 df['Type'] = label_encoder.fit_transform(df['Type'])
