@@ -102,8 +102,10 @@ def main():
     model_pipeline = make_pipeline(preprocessor, xgb_model)
 
     # 4. Start MLflow Parent Run for Hyperparameter Tuning
-    with mlflow.start_run(run_name="XGBoost_Wellness_Package_Tuning") as parent_run:
-        train_dataset = mlflow.data.from_pandas(Xtrain, targets=ytrain, name="travel_wellness_train")
+   
+        with mlflow.start_run(run_name="XGBoost_Wellness_Package_Tuning") as parent_run:
+        # Tracking features lineage only; avoiding embedded target string crashes
+        train_dataset = mlflow.data.from_pandas(Xtrain, name="travel_wellness_train")
         mlflow.log_input(train_dataset, context="training")
 
         print("Starting Hyperparameter Optimization via GridSearchCV...")
