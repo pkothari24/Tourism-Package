@@ -27,22 +27,38 @@ def main():
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment("Wellness_Tourism_Package_Prediction")
 
-    # --- 2. FIXED: Data Loading paths (Read locally from the Runner Workspace) ---
+    # --- 2. FLEXIBLE SUB-DIRECTORY DATA LOADING ---
     current_workspace = os.getcwd()
     
-    Xtrain_path = os.path.join(current_workspace, "Xtrain.csv")
-    Xtest_path = os.path.join(current_workspace, "Xtest.csv")
-    ytrain_path = os.path.join(current_workspace, "ytrain.csv")
-    ytest_path = os.path.join(current_workspace, "ytest.csv")
+    # Check both the workspace root and the project/model_building directory
+    possible_dirs = [
+        os.path.join(current_workspace, "project", "model_building"),
+        current_workspace
+    ]
+    
+    data_dir = None
+    for directory in possible_dirs:
+        test_path = os.path.join(directory, "Xtrain.csv")
+        if os.path.exists(test_path):
+            data_dir = directory
+            break
+            
+    if data_dir is None:
+        print(f"❌ CRITICAL ERROR: Could not find Xtrain.csv anywhere.")
+        print("Root files available:", os.listdir(current_workspace))
+        raise FileNotFoundError("The split data files are completely missing from the runner environment.")
 
-    print(f"Loading split files from workspace: {current_workspace}")
+    Xtrain_path = os.path.join(data_dir, "Xtrain.csv")
+    Xtest_path = os.path.join(data_dir, "Xtest.csv")
+    ytrain_path = os.path.join(data_dir, "ytrain.csv")
+    ytest_path = os.path.join(data_dir, "ytest.csv")
+
+    print(f"🚀 Success! Loading split CSV files from: {data_dir}")
     
     Xtrain = pd.read_csv(Xtrain_path)
     Xtest = pd.read_csv(Xtest_path)
     ytrain = pd.read_csv(ytrain_path).squeeze()  # Ensure 1D series for target
     ytest = pd.read_csv(ytest_path).squeeze()
-
-    print("Dataset parts loaded successfully from local workspace files.")
 
     # Drop CustomerID if it hasn't been dropped in the data preparation phase
     if 'CustomerID' in Xtrain.columns:
@@ -60,7 +76,7 @@ def main():
         'TypeofContact', 'Occupation', 'Gender', 'MaritalStatus', 'Designation', 'ProductPitched'
     ]
 
-    # Calculate scale_pos_weight to handle class imbalance (0: No package bought vs 1: Yes)
+    # Calculate scale_pos_weight to handle class imbalance
     class_weight = ytrain.value_counts()[0] / ytrain.value_counts()[1]
 
     # Preprocessing pipeline matching travel attributes
@@ -69,16 +85,16 @@ def main():
         (OneHotEncoder(handle_unknown='ignore'), categorical_features)
     )
 
-    # Initialize XGBoost Classifier with imbalance weighting
+    # Initialize XGBoost Classifier
     xgb_model = xgb.XGBClassifier(scale_pos_weight=class_weight, random_state=42, eval_metric='logloss')
 
-    # Define hyperparameter grid for tuning search space
+    # Define hyperparameter grid
     param_grid = {
-        'xgbclassifier__n_estimators': [50, 100, 150],
-        'xgbclassifier__max_depth': [3, 4, 5],
-        'xgbclassifier__learning_rate': [0.01, 0.05, 0.1],
-        'xgbclassifier__colsample_bytree': [0.5, 0.7, 0.9],
-        'xgbclassifier__reg_lambda': [0.5, 1.0, 1.5]
+        'xgbclassifier__n_estimators': [50, 100],
+        'xgbclassifier__max_depth': [3, 4],
+        'xgbclassifier__learning_rate': [0.05, 0.1],
+        'xgbclassifier__colsample_bytree': [0.7, 0.9],
+        'xgbclassifier__reg_lambda': [1.0, 1.5]
     }
 
     model_pipeline = make_pipeline(preprocessor, xgb_model)
@@ -91,12 +107,10 @@ def main():
         mlflow.log_input(train_dataset, context="training")
 
         print("Starting Hyperparameter Optimization via GridSearchCV...")
-        # Tuning focuses on 'f1' or 'recall' since identifying interested customers is vital for conversion
-        grid_search = GridSearchCV(model_pipeline, param_grid, cv=5, scoring='f1', n_jobs=-1)
+        grid_search = GridSearchCV(model_pipeline, param_grid, cv=3, scoring='f1', n_jobs=-1)
         grid_search.fit(Xtrain, ytrain)
 
-        # Retrieve the best model pipeline
-        best_model = grid_search.best_estimator_
+        best_model = grid_search.best_estimator__
 
         print("Best Hyperparameters Found:\n", grid_search.best_params_)
         for param_name, param_value in grid_search.best_params_.items():
@@ -106,26 +120,24 @@ def main():
         y_pred_train = best_model.predict(Xtrain)
         y_pred_test = best_model.predict(Xtest)
 
-        # Calculate metrics for conversion prediction evaluation
+        # Calculate metrics
         train_f1 = f1_score(ytrain, y_pred_train)
         test_f1 = f1_score(ytest, y_pred_test)
         test_recall = recall_score(ytest, y_pred_test)
         test_precision = precision_score(ytest, y_pred_test)
         test_accuracy = accuracy_score(ytest, y_pred_test)
 
-        # Log Metrics to MLflow Dashboard
+        # Log Metrics
         mlflow.log_metric("train_f1_score", train_f1)
         mlflow.log_metric("test_f1_score", test_f1)
         mlflow.log_metric("test_recall", test_recall)
         mlflow.log_metric("test_precision", test_precision)
         mlflow.log_metric("test_accuracy", test_accuracy)
 
-        print(f"\nTest Set Metrics Logged - F1: {test_f1:.4f}, Recall: {test_recall:.4f}, Precision: {test_precision:.4f}")
+        print(f"\nTest Set Metrics Logged - F1: {test_f1:.4f}, Recall: {test_recall:.4f}")
 
-        # Infer input-output schema signature for production Streamlit application API guardrails
         signature = infer_signature(Xtest, y_pred_test)
 
-        # Log and Register the model within the central MLflow Model Registry
         model_name = "Wellness_Tourism_Package_Prediction_Model"
         mlflow.sklearn.log_model(
             sk_model=best_model,
@@ -133,13 +145,13 @@ def main():
             signature=signature,
             registered_model_name=model_name
         )
-        print(f"Model logged and versioned in MLflow Registry as '{model_name}'")
+        print(f"Model logged in MLflow Registry as '{model_name}'")
 
     # 5. Serialize Local Artifact File
     model_filename = "best_wellness_package_model_v1.joblib"
     joblib.dump(best_model, model_filename)
 
-    # --- 6. FIXED: Push Verified Model Version to Your Correct HF Account ---
+    # --- 6. Push Verified Model Version to your Hugging Face Space ---
     repo_id = "pkothari24/Tourism-Package" 
     repo_type = "model"
 
