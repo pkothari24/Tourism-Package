@@ -27,9 +27,10 @@ def main():
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment("Wellness_Tourism_Package_Prediction")
 
-    # 2. Local Data Loading directly from GitHub Runner Workspace
+    # 2. Local Data Loading explicitly targeted at the data subdirectory
     current_workspace = os.getcwd()
     possible_dirs = [
+        os.path.join(current_workspace, "project", "data"), # Target directory discovered in workspace diagnostics
         os.path.join(current_workspace, "project", "model_building"),
         current_workspace
     ]
@@ -41,11 +42,12 @@ def main():
             break
             
     if not data_dir:
-        # Fallback list to see where prep.py dropped them
         print("Files in workspace:", os.listdir(current_workspace))
         if os.path.exists(os.path.join(current_workspace, "project")):
             print("Files in project folder:", os.listdir(os.path.join(current_workspace, "project")))
-        raise FileNotFoundError("Could not locate split CSV files locally in the runner workspace.")
+            if os.path.exists(os.path.join(current_workspace, "project", "data")):
+                print("Files in project/data folder:", os.listdir(os.path.join(current_workspace, "project", "data")))
+        raise FileNotFoundError("Could not locate split CSV files locally in any known project folder structures.")
 
     print(f"🚀 Success! Loading split CSV files locally from: {data_dir}")
     Xtrain = pd.read_csv(os.path.join(data_dir, "Xtrain.csv"))
@@ -118,8 +120,7 @@ def main():
     joblib.dump(best_model, model_filename)
     print(f"✅ Local model artifact saved as {model_filename}")
 
-    # --- 6. Push Model File to Hugging Face Model Hub ---
-    # This will AUTOMATICALLY create the repository "Tourism-Package" under your profile!
+    # 6. Push Model File to Hugging Face Model Hub
     repo_id = "pkothari24/Tourism-Package"
     api = HfApi(token=os.getenv("HF_TOKEN"))
 
