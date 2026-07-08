@@ -10,9 +10,8 @@ def main():
 
     api = HfApi(token=hf_token)
 
-    # 2. Configure deployment parameters 
-    # Recommended to update the target repo name to match your new Travel use-case
-    repo_id = "pkothari24/Tourism-Package.git"
+    # 2. Configure deployment parameters (FIXED: Removed .git)
+    repo_id = "pkothari24/Tourism-Package"
     repo_type = "space"
 
     # 3. Ensure the Space repository exists before pushing code
@@ -31,12 +30,19 @@ def main():
         print(f"Space '{repo_id}' successfully created.")
 
     # 4. Upload the deployment assets folder containing app.py and requirements.txt
-    print(f"Uploading deployment files from 'week_2_mls/deployment' to Space: {repo_id}...")
+    # Adjusted path to check your project deployment folder structure dynamically
+    local_deployment_folder = "project/deployment"
+    if not os.path.exists(local_deployment_folder):
+        # Fallback in case your deployment files sit elsewhere in your repository root
+        local_deployment_folder = "deployment"
+
+    print(f"Uploading deployment files from '{local_deployment_folder}' to Space: {repo_id}...")
+    
     api.upload_folder(
-        folder_path="week_2_mls/deployment",     # Local folder containing app.py and requirements.txt
-        repo_id=repo_id,                        # Target space destination
-        repo_type=repo_type,                    # Space ecosystem
-        path_in_repo="",                        # Deploy directly to the root of the space
+        folder_path=local_deployment_folder,     # Local folder containing app.py and requirements.txt
+        repo_id=repo_id,                         # Target space destination
+        repo_type=repo_type,                     # Space ecosystem
+        path_in_repo="",                         # Deploy directly to the root of the space
     )
     print("Deployment upload sequence complete! Your application is compiling on Hugging Face Spaces.")
 
