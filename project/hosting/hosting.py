@@ -1,5 +1,5 @@
 import os
-from huggingface_hub import HfApi, create_repo
+from huggingface_hub import HfApi
 from huggingface_hub.utils import RepositoryNotFoundError
 
 def main():
@@ -21,12 +21,11 @@ def main():
     except RepositoryNotFoundError:
         print(f"Space '{repo_id}' not found. Creating a new Streamlit space repository...")
         
-        # FIXED: Pass token and explicit lowercase framework option parameter mapping
-        create_repo(
+        # FIXED: Call create_repo directly on the api client object instance
+        api.create_repo(
             repo_id=repo_id, 
             repo_type=repo_type, 
             space_sdk="streamlit", 
-            token=hf_token,
             private=False
         )
         print(f"Space '{repo_id}' successfully created.")
