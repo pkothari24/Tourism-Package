@@ -3,11 +3,12 @@ import pandas as pd
 from huggingface_hub import hf_hub_download
 import joblib
 
-# 1. Download and load the latest travel model artifact from Hugging Face Hub
-@st.cache_resource # Caches the model so it doesn't download on every user click
+#  Updated to your active repository
+@st.cache_resource
 def load_production_model():
     model_path = hf_hub_download(
-        repo_id="praneeth232/machine_failure_model", 
+        repo_id="pkothari24/Tourism-Package",        # Your repository name
+        repo_type="model",
         filename="best_wellness_package_model_v1.joblib"
     )
     return joblib.load(model_path)
